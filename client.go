@@ -433,7 +433,14 @@ func (c *Client) do(method, path string, doOptions doOptions) (*http.Response, e
 		if strings.Contains(err.Error(), "connection refused") {
 			return nil, ErrConnectionRefused
 		}
-		return nil, err
+
+		// if error in context, return that instead
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+			return nil, err
+		}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
 		return nil, newError(resp)
@@ -511,7 +518,12 @@ func (c *Client) stream(method, path string, streamOptions streamOptions) error 
 		breader := bufio.NewReader(dial)
 		err = req.Write(dial)
 		if err != nil {
-			return err
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+				return err
+			}
 		}
 
 		// ReadResponse may hang if server does not replay
@@ -527,14 +539,24 @@ func (c *Client) stream(method, path string, streamOptions streamOptions) error 
 			if strings.Contains(err.Error(), "connection refused") {
 				return ErrConnectionRefused
 			}
-			return err
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+				return err
+			}
 		}
 	} else {
 		if resp, err = ctxhttp.Do(subCtx, c.HTTPClient, req); err != nil {
 			if strings.Contains(err.Error(), "connection refused") {
 				return ErrConnectionRefused
 			}
-			return err
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+				return err
+			}
 		}
 	}
 	defer resp.Body.Close()
@@ -551,7 +573,12 @@ func (c *Client) stream(method, path string, streamOptions streamOptions) error 
 		if atomic.LoadUint32(&canceled) != 0 {
 			return ErrInactivityTimeout
 		}
-		return err
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			return err
+		}
 	}
 	return nil
 }
