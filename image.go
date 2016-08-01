@@ -10,12 +10,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"golang.org/x/net/context"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"time"
+
+	"golang.org/x/net/context"
 )
 
 // APIImages represent an image returned in the ListImages call.
@@ -444,6 +445,7 @@ type BuildImageOptions struct {
 	CPUSetCPUs          string             `qs:"cpusetcpus"`
 	InputStream         io.Reader          `qs:"-"`
 	OutputStream        io.Writer          `qs:"-"`
+	ErrorStream         io.Writer          `qs:"-"`
 	RawJSONStream       bool               `qs:"-"`
 	Remote              string             `qs:"remote"`
 	Auth                AuthConfiguration  `qs:"-"` // for older docker X-Registry-Auth header
@@ -517,12 +519,18 @@ func (c *Client) BuildImage(opts BuildImageOptions) error {
 		}
 	}
 
+	stderr := opts.ErrorStream
+	if stderr == nil {
+		stderr = opts.OutputStream
+	}
+
 	return c.stream("POST", fmt.Sprintf("/build?%s", qs), streamOptions{
 		setRawTerminal:    true,
 		rawJSONStream:     opts.RawJSONStream,
 		headers:           headers,
 		in:                opts.InputStream,
 		stdout:            opts.OutputStream,
+		stderr:            stderr,
 		inactivityTimeout: opts.InactivityTimeout,
 		context:           opts.Context,
 	})
