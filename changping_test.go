@@ -19,6 +19,7 @@ func TestBuildImageErrorStream(t *testing.T) {
 	dockerfile := `FROM busybox:latest
 RUN echo "Regular output message"
 RUN echo "This line is printed to standard error" >&2
+RUN echo "xxxx" >&2 && exit 1
 `
 
 	buf := new(bytes.Buffer)
@@ -51,8 +52,9 @@ RUN echo "This line is printed to standard error" >&2
 		InputStream:  buildContext,
 		NoCache:      true,
 		OutputStream: outWriter,
-		ErrorStream:  errWriter,
-		Pull:         true,
+		// ErrorStream:  errWriter,
+		RawJSONStream: true,
+		Pull:          true,
 	}
 
 	go func() {
